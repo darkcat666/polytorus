@@ -58,7 +58,7 @@ impl Transaction {
             address: receipient,
         });
 
-        Ok(transaction)
+        Ok(transaction.sign(&sender))
     }
 
     // sign transaction
@@ -95,17 +95,18 @@ impl Transaction {
             .output
             .iter_mut()
             .find(|output| output.address == sender_wallet.public_key.to_string())
-            .unwrap();
+            .ok_or("Sender not found in outputs")?;
+    
         if amount > sender_output.amount {
             return Err("Amount exceeds balance".to_string());
         }
-
+    
         sender_output.amount -= amount;
         self.output.push(Output {
             amount,
-            address: recipient.to_string(),
+            address: recipient,
         });
-
+    
         Ok(self.sign(&sender_wallet))
     }
 

@@ -1,39 +1,30 @@
 use secp256k1::PublicKey;
 
 use super::transaction::Transaction;
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 #[derive(Debug, Clone)]
 pub struct Pool {
-    pub transactions: Vec<Transaction>,
+    pub transactions: HashMap<String, Transaction>,
 }
 
 impl Pool {
     pub fn new() -> Pool {
         Pool {
-            transactions: Vec::new(),
+            transactions: HashMap::new(),
         }
     }
 
     pub fn update_or_add_transaction(&mut self, transaction: Transaction) {
-        if let Some(existing) = self.transactions.iter_mut().find(|t| t.id == transaction.id) {
-            *existing = transaction;
-        } else {
-            self.transactions.push(transaction);
-        }
+        self.transactions.insert(transaction.id.to_string(), transaction);
     }
 
     pub fn exists(&self, address: &PublicKey) -> Option<&Transaction> {
-        self.transactions
-            .iter()
-            .find(|t| t.input.iter().any(|i| &i.address.public_key == address))
+        self.transactions.values().find(|t| t.input.iter().any(|i| &i.address.public_key == address))
     }
 
     pub fn valid_transactions(&self) -> Vec<&Transaction> {
-        self.transactions
-            .iter()
-            .filter(|t| t.is_valid())
-            .collect()
+        self.transactions.values().filter(|t| t.is_valid()).collect()
     }
 
     pub fn clear(&mut self) {
@@ -41,9 +32,7 @@ impl Pool {
     }
 
     pub fn get_mut(&mut self, public_key: &secp256k1::PublicKey) -> Option<&mut Transaction> {
-        self.transactions
-            .iter_mut()
-            .find(|t| t.input.iter().any(|i| &i.address.public_key == public_key))
+        self.transactions.values_mut().find(|t| t.input.iter().any(|i| &i.address.public_key == public_key))
     }
 
 }
