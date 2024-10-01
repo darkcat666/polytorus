@@ -41,6 +41,9 @@ async fn transact(data: web::Json<PostPoolJson>) -> impl Responder {
     let valid_transactions = {
         let pool = POOL.lock().await;
         pool.valid_transactions()
+            .iter()
+            .map(|t| t.to_json())
+            .collect::<Vec<_>>()
     };
 
     HttpResponse::Ok().json(valid_transactions)

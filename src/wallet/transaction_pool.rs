@@ -16,28 +16,22 @@ impl Pool {
     }
 
     pub fn update_or_add_transaction(&mut self, transaction: Transaction) {
-        if let Some(index) = self
-            .transactions
-            .iter()
-            .position(|t| t.id == transaction.id)
-        {
-            self.transactions[index] = transaction;
+        if let Some(existing) = self.transactions.iter_mut().find(|t| t.id == transaction.id) {
+            *existing = transaction;
         } else {
             self.transactions.push(transaction);
         }
     }
 
-    pub fn exists(&self, address: PublicKey) -> Option<Transaction> {
+    pub fn exists(&self, address: &PublicKey) -> Option<&Transaction> {
         self.transactions
-            .clone()
-            .into_iter()
-            .find(|t| t.input.iter().any(|i| i.address.public_key == address))
+            .iter()
+            .find(|t| t.input.iter().any(|i| &i.address.public_key == address))
     }
 
-    pub fn valid_transactions(&self) -> Vec<Transaction> {
+    pub fn valid_transactions(&self) -> Vec<&Transaction> {
         self.transactions
-            .clone()
-            .into_iter()
+            .iter()
             .filter(|t| t.is_valid())
             .collect()
     }
@@ -45,6 +39,13 @@ impl Pool {
     pub fn clear(&mut self) {
         self.transactions.clear();
     }
+
+    pub fn get_mut(&mut self, public_key: &secp256k1::PublicKey) -> Option<&mut Transaction> {
+        self.transactions
+            .iter_mut()
+            .find(|t| t.input.iter().any(|i| &i.address.public_key == public_key))
+    }
+
 }
 
 impl fmt::Display for Pool {

@@ -55,23 +55,22 @@ impl Wallet {
         &mut self,
         recipient: String,
         amount: u64,
-        chain: &MutexGuard<'_, Chain>,
-        pool: &mut MutexGuard<'_, Pool>,
+        chain: &Chain,
+        pool: &mut Pool,
     ) -> Result<Transaction, String> {
         self.balance = self.calc_balance(&chain);
         if amount > self.balance {
             return Err("Amount exceeds balance".to_string());
         }
 
-        let transaction = pool.exists(self.clone().public_key);
-
-        let transaction = if let Some(mut tx) = transaction {
-            tx.update(self.clone(), recipient, amount)?
+        let transaction = if let Some(existing_tx) = pool.get_mut(&self.public_key) {
+            existing_tx.update(self.clone(), recipient, amount)?
         } else {
             let new_tx = Transaction::new(self.clone(), recipient, amount)?;
             pool.update_or_add_transaction(new_tx.clone());
             new_tx
         };
+
         Ok(transaction)
     }
 

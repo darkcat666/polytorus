@@ -134,6 +134,10 @@ impl Transaction {
         transaction.sign(&sender);
         transaction
     }
+
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!(self)
+    }
 }
 
 #[cfg(test)]
