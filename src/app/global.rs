@@ -47,3 +47,14 @@ pub async fn start_p2p() {
         }
     });
 }
+
+pub async fn initialize_blockchain() -> Arc<Mutex<Chain>> {
+    let chain = CHAIN.lock().await.clone();
+    Arc::new(Mutex::new(chain))
+}
+
+pub async fn initialize_server() -> P2p {
+    let chain = CHAIN.clone();
+    let pool = POOL.clone();
+    P2p::new(chain, pool)
+}

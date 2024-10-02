@@ -1,5 +1,5 @@
 use actix_web::{web, App, HttpServer};
-use polytorus::app::global::{start_p2p, CHAIN, SERVER};
+use polytorus::app::global::{start_p2p, initialize_blockchain, initialize_server};
 use polytorus::app::mine::mine;
 use polytorus::app::miner_transactions::miner_transactions;
 use polytorus::app::p2p::P2p;
@@ -14,20 +14,25 @@ use tokio::sync::Mutex;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let blockchain = Arc::new(Mutex::new(CHAIN.lock().await.clone()));
-    let server: Arc<Mutex<Option<P2p>>> = SERVER.clone();
+    let blockchain = initialize_blockchain().await;
+    let server = initialize_server().await;
 
     let p2p_port: String = std::env::var("P2P_PORT").unwrap_or_else(|_| "5001".to_string());
     let http_port: String = std::env::var("HTTP_PORT").unwrap_or_else(|_| "3001".to_string());
 
-    start_p2p().await;
+    // start_p2p().await;
 
-    let server_clone_for_spawn = server.clone();
+    let server_clone = server.clone();
     tokio::spawn(async move {
-        if let Some(p2p) = &mut *server_clone_for_spawn.lock().await {
-            if let Err(e) = p2p.connect_peers().await {
-                eprintln!("Error connecting to peers: {}", e);
-            }
+        if let Err(e) = server_clone.connect_peers().await {
+            eprintln!("Error connecting to peers: {}", e);
+        }
+    });
+
+    let server_clone = server.clone();
+    tokio::spawn(async move {
+        if let Err(e) = server_clone.listen().await {
+            eprintln!("Error in P2P server: {}", e);
         }
     });
 
