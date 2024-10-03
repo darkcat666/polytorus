@@ -3,52 +3,53 @@ use super::transaction_pool::Pool;
 use crate::blockchain::chain::Chain;
 use crate::blockchain::config::INITIAL_BALANCE;
 use lazy_static::lazy_static;
+use rand::{thread_rng, Rng};
 use secp256k1::hashes::sha256;
 use secp256k1::rand::rngs::OsRng;
 use secp256k1::{Message, Secp256k1};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use tokio::sync::MutexGuard;
+use crate::cryptography::falcon::{self, falcon512};
 
 lazy_static! {
     pub static ref SECP: Secp256k1<secp256k1::All> = Secp256k1::new();
 }
 
-#[derive(Debug, Clone, PartialEq, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Wallet {
     pub balance: u64,
-    pub keypair: secp256k1::Keypair,
-    pub public_key: secp256k1::PublicKey,
+    pub keypair: (falcon512::SecretKey, falcon512::PublicKey),
+    pub public_key: falcon512::PublicKey,
 }
 
 impl Wallet {
     pub fn new() -> Wallet {
-        let (secret_key, public_key) = SECP.generate_keypair(&mut OsRng);
-        let keypair = secp256k1::Keypair::from_secret_key(&SECP, &secret_key);
+        let mut rng = thread_rng();
+        let (secret_key, public_key) = falcon512::keygen(rng.gen());
         Wallet {
             balance: INITIAL_BALANCE,
-            keypair,
+            keypair: (secret_key, public_key.clone()),
             public_key,
         }
     }
 
-    pub fn get_private_key(&self) -> secp256k1::SecretKey {
-        self.keypair.secret_key()
+    fn get_private_key(&self) -> falcon512::SecretKey {
+        self.keypair.0.clone()
     }
 
-    pub fn sign(&self, message_hash: sha256::Hash) -> secp256k1::ecdsa::Signature {
+    pub fn sign(&self, message_hash: sha256::Hash) -> falcon512::Signature {
         let message = Message::from_digest_slice(message_hash.as_ref()).unwrap();
-        SECP.sign_ecdsa(&message, &self.keypair.secret_key())
+        falcon512::sign(message.as_ref(), &self.get_private_key())
     }
 
     pub fn verify(
         &self,
         message_hash: sha256::Hash,
-        signature: secp256k1::ecdsa::Signature,
+        signature: falcon512::Signature,
     ) -> bool {
         let message = Message::from_digest_slice(message_hash.as_ref()).unwrap();
-        SECP.verify_ecdsa(&message, &signature, &self.public_key)
-            .is_ok()
+        falcon512::verify(message.as_ref(), &signature, &self.public_key)
     }
 
     pub fn create_transaction(
@@ -76,10 +77,10 @@ impl Wallet {
     }
 
     pub fn blockchain_wallet() -> Wallet {
-        let (secret_key, public_key) = SECP.generate_keypair(&mut OsRng);
+        let (secret_key, public_key) = falcon512::keygen([0; 32]);
         Wallet {
             balance: 0,
-            keypair: secp256k1::Keypair::from_secret_key(&SECP, &secret_key),
+            keypair: (secret_key, public_key.clone()),
             public_key,
         }
     }
@@ -117,7 +118,7 @@ impl Wallet {
             balance = recent_input_t
                 .output
                 .iter()
-                .find(|o| o.address == self.public_key.to_string())
+                .find(|o| o.address == format!("{:?}", self.public_key))
                 .map(|o| o.amount)
                 .unwrap_or(0);
 
@@ -132,7 +133,7 @@ impl Wallet {
                     if let Some(output) = t
                         .output
                         .iter()
-                        .find(|o| o.address == self.public_key.to_string())
+                        .find(|o| o.address == format!("{:?}", self.public_key))
                     {
                         balance += output.amount;
                     }
@@ -147,7 +148,7 @@ impl fmt::Display for Wallet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Wallet {{ balance: {}, keypair: {:?}, public_key: {} }}",
+            "Wallet {{ balance: {}, keypair: {:?}, public_key: {:?} }}",
             self.balance, self.keypair, self.public_key
         )
     }

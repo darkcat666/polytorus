@@ -1,4 +1,5 @@
 use num::{One, Zero};
+use serde::{Deserialize, Serialize};
 use sha3::digest::{ExtendableOutput, Update, XofReader};
 use sha3::Shake256;
 use std::default::Default;
@@ -11,7 +12,7 @@ use super::field::{Felt, Q};
 use super::inverse::Inverse;
 
 #[doc(hidden)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Polynomial<F> {
     pub coefficients: Vec<F>,
 }

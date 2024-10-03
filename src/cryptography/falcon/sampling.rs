@@ -1,6 +1,7 @@
 use num_complex::{Complex, Complex64};
 use rand::RngCore;
 use rand_distr::num_traits::{One, Zero};
+use serde::{Deserialize, Serialize};
 
 use super::{base_falcon, fft::FastFft, polynomial::Polynomial, sample::sampler_z};
 
@@ -39,7 +40,7 @@ pub fn ldl(
     (l, d)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LdlTree {
     Branch(Polynomial<Complex64>, Box<LdlTree>, Box<LdlTree>),
     Leaf([Complex64; 2]),

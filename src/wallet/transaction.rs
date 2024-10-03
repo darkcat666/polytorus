@@ -2,9 +2,11 @@ use super::wallets::Wallet;
 use crate::blockchain::config::MINING_REWARD;
 use bincode;
 use secp256k1::hashes::{sha256, Hash};
+// use secp256k1::hashes::{sha256, Hash};
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 use uuid::Uuid;
+use crate::cryptography::falcon::falcon512;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Transaction {
@@ -18,7 +20,7 @@ pub struct Input {
     pub timestamp: SystemTime,
     pub amount: u64,
     pub address: Wallet,
-    pub signature: secp256k1::ecdsa::Signature,
+    pub signature: falcon512::Signature,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -43,14 +45,13 @@ impl Transaction {
             timestamp: SystemTime::now(),
             amount: sender.balance,
             address: sender.clone(),
-            signature: sender.sign(sha256::Hash::hash(
-                &bincode::serialize(&transaction.output).unwrap(),
+            signature: sender.sign(sha256::Hash::hash(&bincode::serialize(&transaction.output).unwrap()
             )),
         });
 
         transaction.output.push(Output {
             amount: sender.balance - amount,
-            address: sender.public_key.to_string(),
+            address: format!("{:?}", sender.public_key),
         });
 
         transaction.output.push(Output {
@@ -82,7 +83,7 @@ impl Transaction {
         let message_hash = sha256::Hash::hash(&bincode::serialize(&message.output).unwrap());
         self.input
             .iter()
-            .all(|input| input.address.verify(message_hash, input.signature))
+            .all(|input| input.address.verify(message_hash, input.signature.clone()))
     }
 
     pub fn update(
@@ -94,7 +95,7 @@ impl Transaction {
         let sender_output = self
             .output
             .iter_mut()
-            .find(|output| output.address == sender_wallet.public_key.to_string())
+            .find(|output| output.address == format!("{:?}", sender_wallet.public_key))
             .unwrap();
         if amount > sender_output.amount {
             return Err("Amount exceeds balance".to_string());
@@ -120,7 +121,7 @@ impl Transaction {
             miner,
             vec![Output {
                 amount: MINING_REWARD,
-                address: blockchain.public_key.to_string(),
+                address: format!("{:?}", blockchain.public_key),
             }],
         )
     }
@@ -129,7 +130,7 @@ impl Transaction {
         let mut transaction = self.clone();
         transaction.output.push(Output {
             amount: sender.balance - outputs.iter().map(|output| output.amount).sum::<u64>(),
-            address: sender.public_key.to_string(),
+            address: format!("{:?}", sender.public_key),
         });
         transaction.sign(&sender);
         transaction

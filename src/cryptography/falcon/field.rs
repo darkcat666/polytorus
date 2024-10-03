@@ -4,12 +4,13 @@ use rand_distr::{
     num_traits::{One, Zero},
     Distribution, Standard,
 };
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 
 pub const Q: u32 = 12 * 1024 + 1;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Felt(u32);
 
 impl Felt {

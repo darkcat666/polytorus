@@ -2,6 +2,8 @@ use bit_vec::BitVec;
 use itertools::Itertools;
 use num_complex::{Complex, Complex64};
 use rand::{rngs::StdRng, thread_rng, Rng, RngCore, SeedableRng};
+use serde::{Serialize, Deserialize};
+use serde_bytes;
 
 use super::{
     encoding::{compress, decompress},
@@ -65,7 +67,7 @@ pub enum FalconDeserializationError {
     WrongVariant,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecretKey<const N: usize> {
     b0: [Polynomial<i16>; 4],
     tree: LdlTree,
@@ -269,7 +271,7 @@ impl<const N: usize> PartialEq for SecretKey<N> {
 
 impl<const N: usize> Eq for SecretKey<N> {}
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PublicKey<const N: usize> {
     h: Polynomial<Felt>,
 }
@@ -341,8 +343,9 @@ impl<const N: usize> PublicKey<N> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Signature<const N: usize> {
+    #[serde(with = "serde_bytes")]
     r: [u8; 40],
     s: Vec<u8>,
 }

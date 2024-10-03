@@ -1,4 +1,4 @@
-use secp256k1::PublicKey;
+use crate::cryptography::falcon::falcon512::PublicKey;
 
 use super::transaction::Transaction;
 use std::fmt;
