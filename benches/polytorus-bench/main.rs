@@ -1,4 +1,6 @@
 use polytorus::cryptography::falcon::{falcon512, falcon1024};
+use polytorus::wallet::wallets::Wallet;
+use polytorus::wallet::transaction::Transaction;
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::Rng;
 
@@ -22,5 +24,14 @@ fn bench_falcon1024(c: &mut Criterion) {
     }));
 }
 
-criterion_group!(benches, bench_falcon512, bench_falcon1024);
+fn bench_transaction(c: &mut Criterion) {
+    let wallet = Wallet::new();
+    let transaction = Transaction::new(wallet.clone(), "recipient".to_string(), 10).unwrap();
+    c.bench_function("transaction", |b| b.iter(|| {
+        let signed_transaction = transaction.sign(&wallet);
+        signed_transaction.verify();
+    }));
+}
+
+criterion_group!(benches, bench_falcon512, bench_falcon1024, bench_transaction);
 criterion_main!(benches);
