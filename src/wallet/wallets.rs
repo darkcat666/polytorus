@@ -5,12 +5,11 @@ use crate::blockchain::config::INITIAL_BALANCE;
 use lazy_static::lazy_static;
 use rand::{thread_rng, Rng};
 use secp256k1::hashes::sha256;
-use secp256k1::rand::rngs::OsRng;
 use secp256k1::{Message, Secp256k1};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use tokio::sync::MutexGuard;
-use crate::cryptography::falcon::{self, falcon512};
+use crate::cryptography::falcon::falcon512;
 
 lazy_static! {
     pub static ref SECP: Secp256k1<secp256k1::All> = Secp256k1::new();

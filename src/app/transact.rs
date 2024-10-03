@@ -1,10 +1,6 @@
 use super::global::PostPoolJson;
-use crate::{
-    app::global::{CHAIN, POOL, SERVER, WALLET},
-    wallet::wallets::Wallet,
-};
+use crate::app::global::{CHAIN, POOL, SERVER, WALLET};
 use actix_web::{post, web, HttpResponse, Responder};
-use tokio::sync::MutexGuard;
 
 #[post("/transact")]
 async fn transact(data: web::Json<PostPoolJson>) -> impl Responder {
@@ -19,7 +15,7 @@ async fn transact(data: web::Json<PostPoolJson>) -> impl Responder {
             Ok(tx) => tx,
             Err(e) => {
                 return HttpResponse::BadRequest()
-                    .json(format!("トランザクションの作成に失敗しました: {}", e))
+                    .json(format!("Transaction Error: {}", e))
             }
         }
     };
