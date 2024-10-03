@@ -33,5 +33,13 @@ fn bench_transaction(c: &mut Criterion) {
     }));
 }
 
-criterion_group!(benches, bench_falcon512, bench_falcon1024, bench_transaction);
+fn bench_transaction_update(c: &mut Criterion) {
+    let wallet = Wallet::new();
+    let mut transaction = Transaction::new(wallet.clone(), "recipient".to_string(), 10).unwrap();
+    c.bench_function("transaction_update", |b| b.iter(|| {
+        let _ = transaction.update(wallet.clone(), "recipient".to_string(), 5).unwrap();
+    }));
+}
+
+criterion_group!(benches, bench_falcon512, bench_falcon1024, bench_transaction, bench_transaction_update);
 criterion_main!(benches);
