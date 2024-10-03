@@ -3,6 +3,18 @@ name = "polytorus"
 version = "0.1.0"
 edition = "2021"
 
+[[bench]]
+name = "polytorus-bench"
+harness = false
+
+[lib]
+name = "polytorus"
+path = "src/lib.rs"
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
