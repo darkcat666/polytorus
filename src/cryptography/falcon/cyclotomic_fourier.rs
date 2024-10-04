@@ -23,6 +23,7 @@ where
 {
     fn primitive_root_of_unity(n: usize) -> Self;
 
+    #[inline]
     fn bitreverse_index(arg: usize, n: usize) -> usize {
         assert!(n > 0);
         assert_eq!(n & (n - 1), 0);
@@ -37,6 +38,7 @@ where
         rev
     }
 
+    #[inline]
     fn bitreversed_powers(n: usize) -> Vec<Self> {
         let psi = Self::primitive_root_of_unity(2 * n);
         let mut array = vec![Self::zero(); n];
@@ -49,6 +51,7 @@ where
         array
     }
 
+    #[inline]
     fn bitreversed_powers_inverse(n: usize) -> Vec<Self> {
         let psi = Self::primitive_root_of_unity(2 * n).inverse_or_zero();
         let mut array = vec![Self::zero(); n];
@@ -61,6 +64,7 @@ where
         array
     }
 
+    #[inline]
     fn bitreverse_array<T>(array: &mut [T]) {
         let n = array.len();
         for i in 0..n {
@@ -71,6 +75,7 @@ where
         }
     }
 
+    #[inline]
     fn fft(a: &mut [Self], psi_rev: &[Self]) {
         let n = a.len();
         let mut t = n;
@@ -92,6 +97,7 @@ where
         }
     }
 
+    #[inline]
     fn ifft(a: &mut [Self], psi_inv_rev: &[Self], ninv: Self) {
         let n = a.len();
         let mut t = 1;
@@ -118,6 +124,7 @@ where
         }
     }
 
+    #[inline]
     fn split_fft(f: &[Self], psi_inv_rev: &[Self]) -> (Vec<Self>, Vec<Self>) {
         let n_over_2 = f.len() / 2;
         let mut f0 = vec![Self::zero(); n_over_2];
@@ -132,6 +139,7 @@ where
         (f0, f1)
     }
 
+    #[inline]
     fn merge_fft(f0: &[Self], f1: &[Self], psi_rev: &[Self]) -> Vec<Self> {
         let n_over_2 = f0.len();
         let n = 2 * n_over_2;
@@ -146,11 +154,13 @@ where
 }
 
 impl CyclotomicFourier for Complex64 {
+    #[inline]
     fn primitive_root_of_unity(n: usize) -> Self {
         let angle = 2. * PI / (n as f64);
         Complex64::new(f64::cos(angle), f64::sin(angle))
     }
 
+    #[inline]
     fn bitreversed_powers(n: usize) -> Vec<Self> {
         let mut array = vec![Self::zero(); n];
         let half_circle = PI;
@@ -162,6 +172,7 @@ impl CyclotomicFourier for Complex64 {
         array
     }
 
+    #[inline]
     fn bitreversed_powers_inverse(n: usize) -> Vec<Self> {
         let mut array = vec![Self::zero(); n];
         let half_circle = PI;
