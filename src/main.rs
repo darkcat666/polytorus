@@ -1,5 +1,5 @@
 use actix_web::{web, App, HttpServer};
-use polytorus::app::global::{start_p2p, initialize_blockchain, initialize_server};
+use polytorus::app::global::{initialize_blockchain, initialize_server, start_p2p};
 use polytorus::app::mine::mine;
 use polytorus::app::miner_transactions::miner_transactions;
 use polytorus::app::p2p::P2p;
@@ -24,9 +24,7 @@ async fn main() -> std::io::Result<()> {
 
     let server_clone = server.clone();
     tokio::spawn(async move {
-        if let Err(e) = server_clone.connect_peers().await {
-            eprintln!("Error connecting to peers: {}", e);
-        }
+        server_clone.connect_peers().await;
     });
 
     let server_clone = server.clone();

@@ -17,24 +17,16 @@ async fn transact(data: web::Json<PostPoolJson>) -> impl Responder {
 
         match wallet.create_transaction(recipient, amount, &chain, &mut pool) {
             Ok(tx) => tx,
-            Err(e) => {
-                return HttpResponse::BadRequest()
-                    .json(format!("Transaction Error: {}", e))
-            }
+            Err(e) => return HttpResponse::BadRequest().json(format!("Transaction Error: {}", e)),
         }
     };
 
     {
-        let mut pool = POOL.lock().await;
-        pool.update_or_add_transaction(transaction.clone());
-    }
-
-    {
         let mut server = SERVER.lock().await;
         if let Some(server_instance) = server.as_mut() {
-            if let Err(e) = server_instance.broadcast_transaction(transaction).await {
-                eprintln!("BroadCast Error: {}", e);
-            }
+            server_instance
+                .broadcast_transaction(transaction.clone())
+                .await;
         }
     }
 

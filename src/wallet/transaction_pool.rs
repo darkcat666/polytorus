@@ -7,30 +7,28 @@ use std::{collections::HashMap, fmt};
 #[derive(Debug, Clone)]
 pub struct Pool {
     pub transactions: Vec<Transaction>,
-    transaction_index: HashMap<Uuid, usize>
+    transaction_index: HashMap<Uuid, usize>,
 }
 
 impl Pool {
     pub fn new() -> Pool {
         Pool {
             transactions: Vec::new(),
-            transaction_index: HashMap::new()
+            transaction_index: HashMap::new(),
         }
     }
 
     pub fn update_or_add_transaction(&mut self, transaction: Transaction) {
-        let transaction_id = transaction.id;
-        if let Some(index) = self.transaction_index.get(&transaction_id) {
-            self.transactions[*index] = transaction;
+        if let Some(_) = self.transactions.iter().find(|t| t.id == transaction.id) {
+            println!("Transaction with ID {} already exists", transaction.id);
         } else {
+            println!("Adding new transaction with ID: {}", transaction.id);
             self.transactions.push(transaction);
-            let index = self.transactions.len() - 1;
-            self.transaction_index.insert(transaction_id, index);
         }
     }
 
-    pub fn exists(&self, address: &PublicKey) -> Option<&Transaction> {
-        self.transactions.iter().find(|t| t.input.iter().any(|i| &i.address.public_key == address))
+    pub fn exists(&self, transaction_id: &Uuid) -> bool {
+        self.transactions.iter().any(|t| t.id == *transaction_id)
     }
 
     pub fn valid_transactions(&self) -> Vec<&Transaction> {
@@ -42,9 +40,10 @@ impl Pool {
     }
 
     pub fn get_mut(&mut self, public_key: &secp256k1::PublicKey) -> Option<&mut Transaction> {
-        self.transactions.iter_mut().find(|t| t.input.iter().any(|i| &i.address.public_key == public_key))
+        self.transactions
+            .iter_mut()
+            .find(|t| t.input.iter().any(|i| &i.address.public_key == public_key))
     }
-
 }
 
 impl fmt::Display for Pool {

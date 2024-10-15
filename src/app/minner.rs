@@ -23,7 +23,12 @@ impl Minner {
     }
 
     pub async fn mine(&mut self) -> Block {
-        let mut valid_transaction: Vec<Transaction> = self.transaction_pool.valid_transactions().into_iter().cloned().collect();
+        let mut valid_transaction: Vec<Transaction> = self
+            .transaction_pool
+            .valid_transactions()
+            .into_iter()
+            .cloned()
+            .collect();
 
         let rewards: Vec<Transaction> = valid_transaction
             .iter()
