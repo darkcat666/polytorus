@@ -11,3 +11,4 @@ pub mod polynomial;
 pub mod sample;
 pub mod sampling;
 pub mod u32_field;
+pub mod compress;
