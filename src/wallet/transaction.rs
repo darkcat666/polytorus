@@ -175,4 +175,24 @@ mod tests {
         let signed_transaction = transaction.sign(&wallet);
         assert!(signed_transaction.verify());
     }
+
+    // transaction size
+    #[test]
+    fn test_transaction_size() {
+        let wallet = Wallet::new();
+        let transaction = Transaction::new(wallet.clone(), "recipient".to_string(), 10).unwrap();
+        let serialized = bincode::serialize(&transaction).unwrap();
+        println!("Transaction size: {}", serialized.len());
+    }
+
+    // benchmark transaction time
+    #[test]
+    fn test_transaction_time() {
+        let wallet = Wallet::new();
+        let transaction = Transaction::new(wallet.clone(), "recipient".to_string(), 10).unwrap();
+        let start = SystemTime::now();
+        let serialized = bincode::serialize(&transaction).unwrap();
+        let end = SystemTime::now();
+        println!("Transaction time: {:?}", end.duration_since(start).unwrap());
+    }
 }
