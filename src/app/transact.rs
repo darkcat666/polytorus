@@ -1,10 +1,6 @@
 use super::global::PostPoolJson;
-use crate::{
-    app::global::{CHAIN, POOL, SERVER, WALLET},
-    wallet::wallets::Wallet,
-};
+use crate::app::global::{CHAIN, POOL, SERVER, WALLET};
 use actix_web::{post, web, HttpResponse, Responder};
-use tokio::sync::MutexGuard;
 
 #[post("/transact")]
 async fn transact(data: web::Json<PostPoolJson>) -> impl Responder {
