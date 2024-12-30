@@ -1,264 +1,69 @@
+use std::collections::HashSet;
+use libp2p::{
+    floodsub::{Floodsub, FloodsubEvent, Topic},
+    identity,
+    mdns::{Mdns, MdnsEvent},
+    swarm::NetworkBehaviourEventProcess,
+    NetworkBehaviour,
+    PeerId,
+    Swarm,
+};
+use once_cell::sync::Lazy;
+use tokio::sync::mpsc;
+
 use crate::blockchain::chain::Chain;
-use crate::wallet::{transaction::Transaction, transaction_pool::Pool};
-use futures::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::net::TcpListener;
-use tokio::net::TcpStream;
-use tokio::sync::Mutex;
-use tokio::time::Duration as TokioDuration;
-use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 
-type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
+pub static KEYS: Lazy<identity::Keypair> = Lazy::new(identity::Keypair::generate_ed25519);
+pub static PEER_ID: Lazy<PeerId> = Lazy::new(|| PeerId::from(KEYS.public()));
+pub static CHAIN_TOPIC: Lazy<Topic> = Lazy::new(|| Topic::new("chains"));
+pub static BLOCK_TOPIC: Lazy<Topic> = Lazy::new(|| Topic::new("blocks"));
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-enum MessageType {
-    CHAIN,
-    TRANSACTION,
-    ClearTransaction,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ChainResponse {
+    pub chain: Chain,
+    pub receiver: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-struct Message {
-    type_: MessageType,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    chain: Option<Chain>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    transaction: Option<Transaction>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    clear_transaction: Option<bool>,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LocalChainRequest {
+    pub from_peer_id: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct P2p {
-    chain: Arc<Mutex<Chain>>,
-    transaction_pool: Arc<Mutex<Pool>>,
-    sockets: Arc<Mutex<Vec<Arc<Mutex<WsStream>>>>>,
+pub enum Event {
+    LocalChainRequest(ChainResponse),
+    Input(String),
+    Init,
 }
 
-impl P2p {
-    pub fn new(chain: Arc<Mutex<Chain>>, transaction_pool: Arc<Mutex<Pool>>) -> Self {
-        P2p {
+#[derive(NetworkBehaviour)]
+pub struct ChainBehaviour {
+    pub floodsub: Floodsub,
+    pub mdns: Mdns,
+    #[behaviour(ignore)]
+    pub response_sender: mpsc::UnboundedSender<ChainResponse>,
+    #[behaviour(ignore)]
+    pub init_sender: mpsc::UnboundedSender<bool>,
+    #[behaviour(ignore)]
+    pub chain: Chain,
+}
+
+impl ChainBehaviour {
+    pub async fn new(
+        chain: Chain,
+        response_sender: mpsc::UnboundedSender<ChainResponse>,
+        init_sender: mpsc::UnboundedSender<bool>,
+    ) -> Self {
+        let mut behaviour = Self {
             chain,
-            transaction_pool,
-            sockets: Arc::new(Mutex::new(vec![])),
-        }
-    }
-
-    pub async fn listen(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let p2p_port = std::env::var("P2P_PORT").unwrap_or_else(|_| "5001".to_string());
-        let addr = format!("127.0.0.1:{}", p2p_port);
-        let listener = TcpListener::bind(&addr).await?;
-        println!("Listening on: {}", addr);
-
-        self.connect_peers().await?;
-
-        while let Ok((stream, _)) = listener.accept().await {
-            let ws_stream =
-                tokio_tungstenite::accept_async(tokio_tungstenite::MaybeTlsStream::Plain(stream))
-                    .await
-                    .expect("Failed to accept");
-            self.connect_socket(ws_stream).await;
-        }
-
-        Ok(())
-    }
-
-    pub async fn connect_peers(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let peers = std::env::var("PEERS").unwrap_or_default();
-        let max_retries = 5;
-        let retry_delay = TokioDuration::from_secs(5);
-
-        for peer in peers.split(",") {
-            if !peer.is_empty() {
-                let mut retries = 0;
-                while retries < max_retries {
-                    match connect_async(peer).await {
-                        Ok((ws_stream, _)) => {
-                            self.connect_socket(ws_stream).await;
-                            break;
-                        }
-                        Err(e) => {
-                            eprintln!(
-                                "Failed to connect to peer: {}. Retrying in {} seconds. Error: {}",
-                                peer,
-                                retry_delay.as_secs(),
-                                e
-                            );
-                            retries += 1;
-                            if retries < max_retries {
-                                tokio::time::sleep(retry_delay).await;
-                            }
-                        }
-                    }
-                }
-                // let (ws_stream, _) = connect_async(peer).await?;
-                // self.connect_socket(ws_stream).await;
-                if retries == max_retries {
-                    eprint!("Failed to connect to peer: {}", peer);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    pub async fn connect_socket(&self, ws_stream: WsStream) {
-        // let chain = self.chain.clone();
-        let sockets = self.sockets.clone();
-        let ws_stream = Arc::new(Mutex::new(ws_stream));
-
-        {
-            let mut sockets = sockets.lock().await;
-            sockets.push(ws_stream.clone());
-            println!("Socket connected");
-        }
-
-        self.send_chain(ws_stream.clone()).await;
-        self.message_handler(ws_stream.clone()).await;
-    }
-
-    async fn send_chain(&self, ws_stream: Arc<Mutex<WsStream>>) {
-        let chain = {
-            let chain = self.chain.lock().await;
-            chain.clone()
+            floodsub: Floodsub::new(*PEER_ID),
+            mdns: Mdns::new(Default::default()).await.expect("can create mdns"),
+            response_sender,
+            init_sender,
         };
 
-        let message = Message {
-            type_: MessageType::CHAIN,
-            chain: Some(chain),
-            transaction: None,
-            clear_transaction: None,
-        };
+        behaviour.floodsub.subscribe(CHAIN_TOPIC.clone());
+        behaviour.floodsub.subscribe(BLOCK_TOPIC.clone());
 
-        let json = serde_json::to_string(&message).unwrap();
-
-        let mut ws_stream = ws_stream.lock().await;
-        if let Err(e) = ws_stream
-            .send(tokio_tungstenite::tungstenite::Message::Text(json))
-            .await
-        {
-            eprintln!("Failed to send message: {}", e);
-        }
+        behaviour
     }
-
-    async fn send_transaction(&self, ws_stream: Arc<Mutex<WsStream>>, transaction: Transaction) {
-        let message = Message {
-            type_: MessageType::TRANSACTION,
-            chain: None,
-            transaction: Some(transaction),
-            clear_transaction: None,
-        };
-
-        let json = serde_json::to_string(&message).unwrap();
-
-        let mut ws_stream = ws_stream.lock().await;
-        if let Err(e) = ws_stream
-            .send(tokio_tungstenite::tungstenite::Message::Text(json))
-            .await
-        {
-            eprintln!("Failed to send transaction message: {}", e);
-        }
-    }
-
-    pub async fn sync_chain(&self) {
-        let sockets = self.sockets.lock().await;
-        for socket in sockets.iter() {
-            self.send_chain(socket.clone()).await;
-        }
-    }
-
-    async fn message_handler(&self, ws_stream: Arc<Mutex<WsStream>>) {
-        let blockchain = self.chain.clone();
-        let transaction_pool = self.transaction_pool.clone();
-
-        tokio::spawn(async move {
-            loop {
-                let msg = {
-                    let mut ws_stream = ws_stream.lock().await;
-                    ws_stream.next().await
-                };
-
-                match msg {
-                    Some(Ok(tokio_tungstenite::tungstenite::Message::Text(text))) => {
-                        if let Ok(message) = serde_json::from_str::<Message>(&text) {
-                            match message.type_ {
-                                MessageType::CHAIN => {
-                                    if let Some(chain) = message.chain {
-                                        let mut blockchain = blockchain.lock().await;
-                                        blockchain.replace_chain(&chain);
-                                    }
-                                }
-                                MessageType::TRANSACTION => {
-                                    if let Some(transaction) = message.transaction {
-                                        let mut transaction_pool = transaction_pool.lock().await;
-                                        transaction_pool.update_or_add_transaction(transaction);
-                                    }
-                                }
-                                MessageType::ClearTransaction => {
-                                    let mut transaction_pool = transaction_pool.lock().await;
-                                    transaction_pool.clear();
-                                }
-                            }
-                            println!("Received message type: {:?}", message.type_);
-                        }
-                    }
-                    None => break,
-                    _ => {}
-                }
-            }
-        });
-    }
-
-    pub async fn broadcast_transaction(
-        &self,
-        transaction: Transaction,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let sockets = self.sockets.lock().await;
-        for socket in sockets.iter() {
-            let message = Message {
-                type_: MessageType::TRANSACTION,
-                chain: None,
-                transaction: Some(transaction.clone()),
-                clear_transaction: None,
-            };
-
-            let json = serde_json::to_string(&message)?;
-            let mut ws_stream = socket.lock().await;
-            ws_stream
-                .send(tokio_tungstenite::tungstenite::Message::Text(json))
-                .await?;
-        }
-        Ok(())
-    }
-
-    pub async fn broadcast_clear_transactions(&self) {
-        let sockets = self.sockets.lock().await;
-        for socket in sockets.iter() {
-            let message = Message {
-                type_: MessageType::TRANSACTION,
-                chain: None,
-                transaction: None,
-                clear_transaction: Some(true),
-            };
-
-            let json = serde_json::to_string(&message).unwrap();
-            let mut ws_stream = socket.lock().await;
-            if let Err(e) = ws_stream
-                .send(tokio_tungstenite::tungstenite::Message::Text(json))
-                .await
-            {
-                eprintln!("Failed to send clear transaction message: {}", e);
-            }
-        }
-    }
-}
-
-pub async fn run_p2p(
-    chain: Chain,
-    transaction_pool: Pool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let chain = Arc::new(Mutex::new(chain));
-    let transaction_pool = Arc::new(Mutex::new(transaction_pool));
-    let p2p = P2p::new(chain, transaction_pool);
-    p2p.listen().await
 }

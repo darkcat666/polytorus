@@ -1,5 +1,5 @@
 use actix_web::{web, App, HttpServer};
-use polytorus::app::global::{start_p2p, CHAIN, SERVER};
+use polytorus::app::global::{start_p2p, CHAIN, POOL, SERVER};
 use polytorus::app::mine::mine;
 use polytorus::app::miner_transactions::miner_transactions;
 use polytorus::app::p2p::P2p;
@@ -14,11 +14,16 @@ use tokio::sync::Mutex;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let blockchain = Arc::new(Mutex::new(CHAIN.lock().await.clone()));
+    // let blockchain = Arc::new(Mutex::new(CHAIN.lock().await.clone()));
     let server: Arc<Mutex<Option<P2p>>> = SERVER.clone();
 
     let p2p_port: String = std::env::var("P2P_PORT").unwrap_or_else(|_| "5001".to_string());
     let http_port: String = std::env::var("HTTP_PORT").unwrap_or_else(|_| "3001".to_string());
+
+    {
+        let instance = P2p::new(CHAIN.clone(), POOL.clone());
+        *server.lock().await = Some(instance);
+    }
 
     start_p2p().await;
 
@@ -36,7 +41,10 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(blockchain.clone()))
+            .app_data(web::Data::new(CHAIN.clone()))
+            .app_data(web::Data::new(SERVER.clone()))
+            .app_data(web::Data::new(POOL.clone()))
+            // .app_data(web::Data::new(blockchain.clone()))
             .app_data(web::Data::new(server.clone()))
             .service(index)
             .service(block)
