@@ -75,4 +75,8 @@ impl Block {
         let data = serialize(&self.header)?;
         Ok(data)
     }
+
+    pub fn get_hash(&self) -> &str {
+        &self.hash
+    }
 }
