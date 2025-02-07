@@ -1,4 +1,4 @@
-use crate::domain::transaction::TXOutput;
+use crate::domain::transaction::{TXOutput, TXOutputs};
 use std::collections::HashMap;
 use std::error::Error;
 use std::hash::Hash;
@@ -21,8 +21,8 @@ impl<'a, R: crate::application::port::utxo::UTXORepository> UTXOSet<'a, R> {
         let mut accumulated = 0;
 
         let all_utxos = self.repo.get_all_utxos()?;
-        for (txid, outs) in all_utxos.iter() {
-            for (idx, output) in outs.outputs iter().enumerate() {
+        for (txid, outputs) in all_utxos.iter() {
+            for (idx, output) in outputs.iter().enumerate() {
                 if output.is_locked_with_key(pub_key_hash) && accumulated < amount {
                     accumulated += output.value;
                     unspent_outputs
