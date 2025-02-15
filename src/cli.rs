@@ -1,11 +1,10 @@
 //! cli process
 
-use super::*;
 use crate::blockchain::*;
 use crate::server::*;
 use crate::transaction::*;
 use crate::utxoset::*;
-use crate::wallets::*;
+use crate::wallets::wallets::Wallets;
 use bitcoincash_addr::Address;
 use clap::{App, Arg};
 use std::process::exit;
@@ -17,7 +16,7 @@ impl Cli {
         Cli {}
     }
 
-    pub fn run(&mut self) -> Result<()> {
+    pub fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         info!("run app");
         let matches = App::new("polytorus")
             .version("0.1")
@@ -152,7 +151,7 @@ impl Cli {
     }
 }
 
-fn cmd_send(from: &str, to: &str, amount: i32, mine_now: bool, target_node: Option<&str>) -> Result<()> {
+fn cmd_send(from: &str, to: &str, amount: i32, mine_now: bool, target_node: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
     let bc = Blockchain::new()?;
     let mut utxo_set = UTXOSet { blockchain: bc };
     let wallets = Wallets::new()?;
@@ -171,21 +170,21 @@ fn cmd_send(from: &str, to: &str, amount: i32, mine_now: bool, target_node: Opti
     Ok(())
 }
 
-fn cmd_create_wallet() -> Result<String> {
+fn cmd_create_wallet() -> Result<String, Box<dyn std::error::Error>> {
     let mut ws = Wallets::new()?;
     let address = ws.create_wallet();
     ws.save_all()?;
     Ok(address)
 }
 
-fn cmd_reindex() -> Result<i32> {
+fn cmd_reindex() -> Result<i32, Box<dyn std::error::Error>> {
     let bc = Blockchain::new()?;
     let utxo_set = UTXOSet { blockchain: bc };
     utxo_set.reindex()?;
-    utxo_set.count_transactions()
+    utxo_set.count_transactions().map_err(|e| Box::<dyn std::error::Error>::from(e))
 }
 
-fn cmd_create_blockchain(address: &str) -> Result<()> {
+fn cmd_create_blockchain(address: &str) -> Result<(), Box<dyn std::error::Error>> {
     let address = String::from(address);
     let bc = Blockchain::create_blockchain(address)?;
 
@@ -195,7 +194,7 @@ fn cmd_create_blockchain(address: &str) -> Result<()> {
     Ok(())
 }
 
-fn cmd_get_balance(address: &str) -> Result<i32> {
+fn cmd_get_balance(address: &str) -> Result<i32, Box<dyn std::error::Error>> {
     let pub_key_hash = Address::decode(address).unwrap().body;
     let bc = Blockchain::new()?;
     let utxo_set = UTXOSet { blockchain: bc };
@@ -208,7 +207,7 @@ fn cmd_get_balance(address: &str) -> Result<i32> {
     Ok(balance)
 }
 
-fn cmd_print_chain() -> Result<()> {
+fn cmd_print_chain() -> Result<(), Box<dyn std::error::Error>> {
     let bc = Blockchain::new()?;
     for b in bc.iter() {
         println!("{:#?}", b);
@@ -216,7 +215,7 @@ fn cmd_print_chain() -> Result<()> {
     Ok(())
 }
 
-fn cmd_list_address() -> Result<()> {
+fn cmd_list_address() -> Result<(), Box<dyn std::error::Error>> {
     let ws = Wallets::new()?;
     let addresses = ws.get_all_addresses();
     println!("addresses: ");

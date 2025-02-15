@@ -1,131 +1,20 @@
-use super::*;
-use bincode::{deserialize, serialize};
-use bitcoincash_addr::*;
-use crypto::digest::Digest;
-use crypto::ripemd160::Ripemd160;
-use crypto::sha2::Sha256;
-use fn_dsa::{
-    sign_key_size, vrfy_key_size, KeyPairGenerator, KeyPairGeneratorStandard,
-    FN_DSA_LOGN_512, 
-};
-use rand_core::OsRng;
-use serde::{Deserialize, Serialize};
-use sled;
-use std::collections::HashMap;
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Wallet {
-    pub secret_key: Vec<u8>,
-    pub public_key: Vec<u8>,
-}
-
-impl Wallet {
-    /// NewWallet creates and returns a Wallet
-    fn new() -> Self {
-        let mut kg = KeyPairGeneratorStandard::default();
-        let mut sign_key = [0u8; sign_key_size(FN_DSA_LOGN_512)];
-        let mut vrfy_key = [0u8; vrfy_key_size(FN_DSA_LOGN_512)];
-        kg.keygen(FN_DSA_LOGN_512, &mut OsRng, &mut sign_key, &mut vrfy_key);
-
-        Wallet {
-            secret_key: sign_key.to_vec(),
-            public_key: vrfy_key.to_vec(),
-        }
-    }
-
-    /// GetAddress returns wallet address
-    pub fn get_address(&self) -> String {
-        let mut pub_hash: Vec<u8> = self.public_key.clone();
-        hash_pub_key(&mut pub_hash);
-        let address = Address {
-            body: pub_hash,
-            scheme: Scheme::Base58,
-            hash_type: HashType::Script,
-            ..Default::default()
-        };
-        address.encode().unwrap()
-    }
-}
-
-/// HashPubKey hashes public key
-pub fn hash_pub_key(pubKey: &mut Vec<u8>) {
-    let mut hasher1 = Sha256::new();
-    hasher1.input(pubKey);
-    hasher1.result(pubKey);
-    let mut hasher2 = Ripemd160::new();
-    hasher2.input(pubKey);
-    pubKey.resize(20, 0);
-    hasher2.result(pubKey);
-}
-
-pub struct Wallets {
-    wallets: HashMap<String, Wallet>,
-}
-
-impl Wallets {
-    /// NewWallets creates Wallets and fills it from a file if it exists
-    pub fn new() -> Result<Wallets> {
-        let mut wlt = Wallets {
-            wallets: HashMap::<String, Wallet>::new(),
-        };
-        let db = sled::open("data/wallets")?;
-
-        for item in db.into_iter() {
-            let i = item?;
-            let address = String::from_utf8(i.0.to_vec())?;
-            let wallet = deserialize(&i.1.to_vec())?;
-            wlt.wallets.insert(address, wallet);
-        }
-        drop(db);
-        Ok(wlt)
-    }
-
-    /// CreateWallet adds a Wallet to Wallets
-    pub fn create_wallet(&mut self) -> String {
-        let wallet = Wallet::new();
-        let address = wallet.get_address();
-        self.wallets.insert(address.clone(), wallet);
-        info!("create wallet: {}", address);
-        address
-    }
-
-    /// GetAddresses returns an array of addresses stored in the wallet file
-    pub fn get_all_addresses(&self) -> Vec<String> {
-        let mut addresses = Vec::<String>::new();
-        for (address, _) in &self.wallets {
-            addresses.push(address.clone());
-        }
-        addresses
-    }
-
-    /// GetWallet returns a Wallet by its address
-    pub fn get_wallet(&self, address: &str) -> Option<&Wallet> {
-        self.wallets.get(address)
-    }
-
-    /// SaveToFile saves wallets to a file
-    pub fn save_all(&self) -> Result<()> {
-        let db = sled::open("data/wallets")?;
-
-        for (address, wallet) in &self.wallets {
-            let data = serialize(wallet)?;
-            db.insert(address, data)?;
-        }
-
-        db.flush()?;
-        drop(db);
-        Ok(())
-    }
-}
+pub mod wallet;
+pub mod wallets;
 
 #[cfg(test)]
-mod test {
-    use super::*;
+mod tests {
+    use super::wallet::Wallet;
+    use super::wallet::hash_pub_key;
+    use super::wallets::Wallets;
+    use fn_dsa::SigningKey;
+    use fn_dsa::VerifyingKey;
     use fn_dsa::{
         signature_size,
-        SigningKey, SigningKeyStandard, VerifyingKey, VerifyingKeyStandard, DOMAIN_NONE,
+        SigningKeyStandard, VerifyingKeyStandard, DOMAIN_NONE,
         HASH_ID_RAW,
     };
+    use rand_core::OsRng;
+
     #[test]
     fn test_create_wallet_and_hash() {
         let w1 = Wallet::new();
@@ -136,7 +25,7 @@ mod test {
         let mut p2 = w2.public_key.clone();
         hash_pub_key(&mut p2);
         assert_eq!(p2.len(), 20);
-        let pub_key_hash = Address::decode(&w2.get_address()).unwrap().body;
+        let pub_key_hash = bitcoincash_addr::Address::decode(&w2.get_address()).unwrap().body;
         assert_eq!(pub_key_hash, p2);
     }
 

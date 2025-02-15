@@ -555,7 +555,7 @@ fn bytes_to_cmd(bytes: &[u8]) -> Result<Message> {
 mod test {
     use super::*;
     use crate::blockchain::*;
-    use crate::wallets::*;
+    use crate::wallets::wallets::Wallets;
 
     #[test]
     fn test_cmd() {
