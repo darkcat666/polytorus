@@ -1,6 +1,11 @@
 // src/cli/tui.rs
 use crate::{
-    blockchain::blockchain::Blockchain, command::cli::{cmd_create_blockchain, cmd_create_wallet, cmd_get_balance, cmd_list_address, cmd_reindex}, crypto::wallets::Wallets, Result
+    blockchain::blockchain::Blockchain,
+    command::cli::{
+        cmd_create_blockchain, cmd_create_wallet, cmd_get_balance, cmd_list_address, cmd_reindex,
+    },
+    crypto::wallets::Wallets,
+    Result,
 };
 
 use crossterm::{
@@ -9,11 +14,15 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    backend::CrosstermBackend, layout::{Alignment, Constraint, Direction, Layout}, prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap}, Terminal
+    backend::CrosstermBackend,
+    layout::{Alignment, Constraint, Direction, Layout},
+    prelude::Backend,
+    style::{Color, Style},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    Terminal,
 };
 use std::io;
 use std::time::{Duration, Instant};
-
 
 pub fn tui_print_chain<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
     // ブロックチェーン全体を取得（iter() は tip からジェネシス方向へ進むため、reverse して表示順を整える）
@@ -29,7 +38,12 @@ pub fn tui_print_chain<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
             let prev = block.get_prev_hash();
             let hash_prefix = if hash.len() >= 8 { &hash[..8] } else { &hash };
             let prev_prefix = if prev.len() >= 8 { &prev[..8] } else { &prev };
-            format!("Height: {} | Hash: {} | Prev: {}", block.get_height(), hash_prefix, prev_prefix)
+            format!(
+                "Height: {} | Hash: {} | Prev: {}",
+                block.get_height(),
+                hash_prefix,
+                prev_prefix
+            )
         })
         .collect();
 
@@ -67,7 +81,11 @@ pub fn tui_print_chain<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
                 "No block selected".to_string()
             };
             let detail_paragraph = Paragraph::new(detail)
-                .block(Block::default().borders(Borders::ALL).title("Block Details"))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Block Details"),
+                )
                 .scroll((detail_scroll_x, 0));
             f.render_widget(detail_paragraph, chunks[1]);
         })?;
@@ -121,7 +139,9 @@ pub fn tui_create_wallet<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
     loop {
         terminal.draw(|f| {
             let size = f.area();
-            let block = Block::default().borders(Borders::ALL).title("Create Wallet");
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title("Create Wallet");
             let paragraph = Paragraph::new(format!(
                 "Wallet created:\n\n{}\n\nPress any key to return.",
                 address
@@ -140,7 +160,6 @@ pub fn tui_create_wallet<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
     Ok(())
 }
 
-
 pub fn tui_get_balance<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
     // ウォレット内の全アドレスを取得
     let ws = Wallets::new()?;
@@ -152,10 +171,12 @@ pub fn tui_get_balance<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
             terminal.draw(|f| {
                 let size = f.area();
                 let block = Block::default().borders(Borders::ALL).title("Get Balance");
-                let paragraph = Paragraph::new("No wallet found. Please create one first.\n\nPress any key to return.")
-                    .block(block)
-                    .alignment(Alignment::Center)
-                    .wrap(Wrap { trim: true });
+                let paragraph = Paragraph::new(
+                    "No wallet found. Please create one first.\n\nPress any key to return.",
+                )
+                .block(block)
+                .alignment(Alignment::Center)
+                .wrap(Wrap { trim: true });
                 f.render_widget(paragraph, size);
             })?;
             if event::poll(Duration::from_millis(250))? {
@@ -179,7 +200,11 @@ pub fn tui_get_balance<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
                 .map(|a| ListItem::new(a.as_str()))
                 .collect();
             let list = List::new(items)
-                .block(Block::default().borders(Borders::ALL).title("Select Wallet for Balance (Enter to confirm, q to cancel)"))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Select Wallet for Balance (Enter to confirm, q to cancel)"),
+                )
                 .highlight_style(Style::default().fg(Color::Yellow))
                 .highlight_symbol(">> ");
             f.render_stateful_widget(list, size, &mut list_state);
@@ -225,7 +250,9 @@ pub fn tui_get_balance<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
     loop {
         terminal.draw(|f| {
             let size = f.area();
-            let block = Block::default().borders(Borders::ALL).title("Balance Result");
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title("Balance Result");
             let paragraph = Paragraph::new(format!(
                 "Wallet: {}\nBalance: {}\n\nPress any key to return.",
                 addr, balance
@@ -243,7 +270,6 @@ pub fn tui_get_balance<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
     }
     Ok(())
 }
-
 
 pub struct TuiApp {
     pub menu_items: Vec<&'static str>,
@@ -336,29 +362,17 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>) -> Result<(
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(2)
-                .constraints(
-                    [
-                        Constraint::Percentage(80),
-                        Constraint::Percentage(20),
-                    ]
-                    .as_ref(),
-                )
+                .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref())
                 .split(size);
 
-            let items: Vec<ListItem> = app
-                .menu_items
-                .iter()
-                .map(|i| ListItem::new(*i))
-                .collect();
+            let items: Vec<ListItem> = app.menu_items.iter().map(|i| ListItem::new(*i)).collect();
             let list = List::new(items)
                 .block(Block::default().borders(Borders::ALL).title("Menu"))
                 .highlight_style(Style::default().fg(Color::Yellow))
                 .highlight_symbol(">> ");
             f.render_stateful_widget(list, chunks[0], &mut app.state);
 
-            let instructions = Block::default()
-                .borders(Borders::ALL)
-                .title("Instructions");
+            let instructions = Block::default().borders(Borders::ALL).title("Instructions");
             f.render_widget(instructions, chunks[1]);
         })?;
 
@@ -408,13 +422,19 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>) -> Result<(
                                 }
                                 "Send" => {
                                     // ※ Send は対話入力が必要になるため、ここでは簡易的にメッセージ表示のみ
-                                    println!("Send functionality is not fully interactive in TUI yet.");
+                                    println!(
+                                        "Send functionality is not fully interactive in TUI yet."
+                                    );
                                 }
                                 "Start Node" => {
-                                    println!("Start Node functionality is not supported in TUI mode.");
+                                    println!(
+                                        "Start Node functionality is not supported in TUI mode."
+                                    );
                                 }
                                 "Start Miner" => {
-                                    println!("Start Miner functionality is not supported in TUI mode.");
+                                    println!(
+                                        "Start Miner functionality is not supported in TUI mode."
+                                    );
                                 }
                                 "Quit" => break,
                                 _ => {}
