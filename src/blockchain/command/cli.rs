@@ -27,7 +27,6 @@ impl Cli {
             .subcommand(App::new("createwallet").about("create a wallet"))
             .subcommand(App::new("listaddresses").about("list all addresses"))
             .subcommand(App::new("reindex").about("reindex UTXO"))
-            .subcommand(App::new("tui").about("start TUI mode"))
             .subcommand(
                 App::new("startnode")
                     .about("start the node server")
@@ -78,9 +77,7 @@ impl Cli {
             )
             .get_matches();
 
-        if let Some(_) = matches.subcommand_matches("tui") {
-            crate::command::tui::run_tui()?; 
-        } else if let Some(ref matches) = matches.subcommand_matches("getbalance") {
+        if let Some(ref matches) = matches.subcommand_matches("getbalance") {
             if let Some(address) = matches.value_of("address") {
                 let balance = cmd_get_balance(address)?;
                 println!("Balance: {}\n", balance);
