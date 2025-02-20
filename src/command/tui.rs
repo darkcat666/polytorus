@@ -150,7 +150,7 @@ pub fn tui_get_balance<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
         // アドレスが無い場合はエラーメッセージを表示して終了
         loop {
             terminal.draw(|f| {
-                let size = f.size();
+                let size = f.area();
                 let block = Block::default().borders(Borders::ALL).title("Get Balance");
                 let paragraph = Paragraph::new("No wallet found. Please create one first.\n\nPress any key to return.")
                     .block(block)
@@ -173,7 +173,7 @@ pub fn tui_get_balance<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
     // アドレス一覧の選択画面
     loop {
         terminal.draw(|f| {
-            let size = f.size();
+            let size = f.area();
             let items: Vec<ListItem> = addresses
                 .iter()
                 .map(|a| ListItem::new(a.as_str()))
@@ -224,7 +224,7 @@ pub fn tui_get_balance<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
     // 残高結果の画面を表示
     loop {
         terminal.draw(|f| {
-            let size = f.size();
+            let size = f.area();
             let block = Block::default().borders(Borders::ALL).title("Balance Result");
             let paragraph = Paragraph::new(format!(
                 "Wallet: {}\nBalance: {}\n\nPress any key to return.",
