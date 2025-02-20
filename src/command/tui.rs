@@ -9,7 +9,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, List, ListItem, ListState, Paragraph}, Terminal
+    backend::CrosstermBackend, layout::{Alignment, Constraint, Direction, Layout}, prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap}, Terminal
 };
 use std::io;
 use std::time::{Duration, Instant};
@@ -41,7 +41,7 @@ pub fn tui_print_chain<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
 
     loop {
         terminal.draw(|f| {
-            let size = f.size();
+            let size = f.area();
             // 画面を左右に分割：左はブロック一覧、右は詳細情報
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
@@ -116,6 +116,133 @@ pub fn tui_print_chain<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
     Ok(())
 }
 
+pub fn tui_create_wallet<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
+    let address = cmd_create_wallet()?;
+    loop {
+        terminal.draw(|f| {
+            let size = f.area();
+            let block = Block::default().borders(Borders::ALL).title("Create Wallet");
+            let paragraph = Paragraph::new(format!(
+                "Wallet created:\n\n{}\n\nPress any key to return.",
+                address
+            ))
+            .block(block)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true });
+            f.render_widget(paragraph, size);
+        })?;
+        if event::poll(Duration::from_millis(250))? {
+            if let Event::Key(_) = event::read()? {
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
+
+pub fn tui_get_balance<B: Backend>(terminal: &mut Terminal<B>) -> Result<()> {
+    // ウォレット内の全アドレスを取得
+    let ws = Wallets::new()?;
+    let addresses = ws.get_all_addresses();
+
+    if addresses.is_empty() {
+        // アドレスが無い場合はエラーメッセージを表示して終了
+        loop {
+            terminal.draw(|f| {
+                let size = f.size();
+                let block = Block::default().borders(Borders::ALL).title("Get Balance");
+                let paragraph = Paragraph::new("No wallet found. Please create one first.\n\nPress any key to return.")
+                    .block(block)
+                    .alignment(Alignment::Center)
+                    .wrap(Wrap { trim: true });
+                f.render_widget(paragraph, size);
+            })?;
+            if event::poll(Duration::from_millis(250))? {
+                if let Event::Key(_) = event::read()? {
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    // アドレス一覧から選択する ListState を作成
+    let mut list_state = ListState::default();
+    list_state.select(Some(0));
+
+    // アドレス一覧の選択画面
+    loop {
+        terminal.draw(|f| {
+            let size = f.size();
+            let items: Vec<ListItem> = addresses
+                .iter()
+                .map(|a| ListItem::new(a.as_str()))
+                .collect();
+            let list = List::new(items)
+                .block(Block::default().borders(Borders::ALL).title("Select Wallet for Balance (Enter to confirm, q to cancel)"))
+                .highlight_style(Style::default().fg(Color::Yellow))
+                .highlight_symbol(">> ");
+            f.render_stateful_widget(list, size, &mut list_state);
+        })?;
+
+        if event::poll(Duration::from_millis(250))? {
+            if let Event::Key(key) = event::read()? {
+                match key.code {
+                    KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Down => {
+                        if let Some(selected) = list_state.selected() {
+                            let next = if selected >= addresses.len() - 1 {
+                                0
+                            } else {
+                                selected + 1
+                            };
+                            list_state.select(Some(next));
+                        }
+                    }
+                    KeyCode::Up => {
+                        if let Some(selected) = list_state.selected() {
+                            let prev = if selected == 0 {
+                                addresses.len() - 1
+                            } else {
+                                selected - 1
+                            };
+                            list_state.select(Some(prev));
+                        }
+                    }
+                    KeyCode::Enter => break, // 選択確定
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    // 選択されたアドレスを取得し、その残高を計算
+    let selected_index = list_state.selected().unwrap();
+    let addr = addresses[selected_index].clone();
+    let balance = cmd_get_balance(&addr)?;
+
+    // 残高結果の画面を表示
+    loop {
+        terminal.draw(|f| {
+            let size = f.size();
+            let block = Block::default().borders(Borders::ALL).title("Balance Result");
+            let paragraph = Paragraph::new(format!(
+                "Wallet: {}\nBalance: {}\n\nPress any key to return.",
+                addr, balance
+            ))
+            .block(block)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true });
+            f.render_widget(paragraph, size);
+        })?;
+        if event::poll(Duration::from_millis(250))? {
+            if let Event::Key(_) = event::read()? {
+                break;
+            }
+        }
+    }
+    Ok(())
+}
 
 
 pub struct TuiApp {
@@ -270,13 +397,14 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>) -> Result<(
                                     }
                                 }
                                 "Get Balance" => {
-                                    let ws = Wallets::new()?;
-                                    if let Some(addr) = ws.get_all_addresses().first() {
-                                        let balance = cmd_get_balance(addr)?;
-                                        println!("Balance for {}: {}", addr, balance);
-                                    } else {
-                                        println!("No wallet found. Create one first.");
-                                    }
+                                    // let ws = Wallets::new()?;
+                                    // if let Some(addr) = ws.get_all_addresses().first() {
+                                    //     let balance = cmd_get_balance(addr)?;
+                                    //     println!("Balance for {}: {}", addr, balance);
+                                    // } else {
+                                    //     println!("No wallet found. Create one first.");
+                                    // }
+                                    tui_get_balance(terminal)?;
                                 }
                                 "Send" => {
                                     // ※ Send は対話入力が必要になるため、ここでは簡易的にメッセージ表示のみ
