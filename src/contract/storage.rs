@@ -30,3 +30,50 @@ impl ContractAccount {
         self.storage.insert(key, value);
     }
 }
+
+pub struct ContractStage {
+    db: sled::Db,
+}
+
+impl ContractStage {
+    pub fn new() -> Result<Self> {
+        let db = sled::open("data/contracts")?;
+        Ok(ContractStage { db })
+    }
+
+    pub fn get_contract(&self, address: &str) -> Result<Option<ContractAccount>> {
+        match self.db.get(address)? {
+            Some(v) => {
+                let constact: ContractAccount = deserialize(address)?;
+                Ok(Some(constact))
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub fn save_contact(&self, contract: &ContractAccount) -> Result<()> {
+        let data = serialize(contract)?;
+        self.db.insert(&contract.address, data)?;
+        self.db.flush()?;
+
+        Ok(())
+    }
+
+    pub fn delete_contract(&self, address: &str) -> Result<()> {
+        self.db.remove(address)?;
+        self.db.flush()?;
+
+        Ok(())
+    }
+
+    pub fn list_contracts(&self) -> Result<Vec<String>> {
+        let mut contracts = Vec::new();
+        
+        for result in self.db.iter() {
+            let (key, _) = result?;
+            contracts.push(String::from_utf8(key.to_vec())?);
+        }
+
+        Ok(contracts)
+    }
+}
