@@ -43,8 +43,8 @@ impl ContractStage {
 
     pub fn get_contract(&self, address: &str) -> Result<Option<ContractAccount>> {
         match self.db.get(address)? {
-            Some(v) => {
-                let constact: ContractAccount = deserialize(address)?;
+            Some(data) => {
+                let constact: ContractAccount = deserialize(&data)?;
                 Ok(Some(constact))
             }
             None => Ok(None),
