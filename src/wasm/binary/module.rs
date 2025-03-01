@@ -1,4 +1,12 @@
-use nom::{IResult, number::complete::le_u32, bytes::complete::tag};
+use super::section::SectionCode;
+use nom::{
+    bytes::complete::tag,
+    number::complete::{le_u32, le_u8},
+    sequence::pair,
+    IResult,
+};
+use nom_leb128::leb128_u32;
+use num_traits::FromPrimitive as _;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
@@ -32,6 +40,17 @@ impl Module {
         };
         Ok((input, module))
     }
+}
+
+fn decode_section_header(input: &[u8]) -> IResult<&[u8], (SectionCode, u32)> {
+    let (input, (code, size)) = pair(le_u8, leb128_u32)(input)?; // ①
+    Ok((
+        input,
+        (
+            SectionCode::from_u8(code).expect("unexpected section code"), // ②
+            size,
+        ),
+    ))
 }
 
 #[cfg(test)]
