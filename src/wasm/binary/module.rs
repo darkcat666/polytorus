@@ -13,6 +13,7 @@ pub struct Module {
     pub magic: String,
     pub version: u32,
     pub type_section: Option<Vec<FuncType>>,
+    pub function_section: Option<Vec<u32>>,
 }
 
 impl Default for Module {
@@ -21,6 +22,7 @@ impl Default for Module {
             magic: "\0asm".to_string(),
             version: 1,
             type_section: None,
+            function_section: None,
         }
     }
 }
@@ -54,6 +56,11 @@ impl Module {
                             let (_, types) = decode_type_section(section_contents)?;
                             module.type_section = Some(types);
                         }
+
+                        SectionCode::Function => {
+                            let (_, func_id_list) = decode_function_section(section_contents)?;
+                            module.function_section = Some(func_id_list);
+                        }
                         _ => todo!(),
                     };
 
@@ -81,6 +88,19 @@ fn decode_type_section(_input: &[u8]) -> IResult<&[u8], Vec<FuncType>> {
     let func_types = vec![FuncType::default()];
 
     Ok((_input, func_types))
+}
+
+fn decode_function_section(input: &[u8]) -> IResult<&[u8], Vec<u32>> {
+    let mut func_idx_list = vec![];
+    let (mut input, count) = leb128_u32(input)?;
+
+    for _ in 0..count {
+        let (rest, idx) = leb128_u32(input)?;
+        func_idx_list.push(idx);
+        input = rest;
+    }
+
+    Ok((&[], func_idx_list))
 }
 
 #[cfg(test)]
