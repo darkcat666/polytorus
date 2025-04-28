@@ -78,6 +78,7 @@ pub fn hash_pub_key(pubKey: &mut Vec<u8>) {
     hasher2.result(pubKey);
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Wallets {
     wallets: HashMap<String, Wallet>,
 }
